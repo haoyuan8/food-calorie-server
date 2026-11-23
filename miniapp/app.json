@@ -1,7 +1,7 @@
 {
   "pages": ["pages/index/index", "pages/result/result"],
   "window": {
-    "navigationBarTitleText": "这顿多少卡",
+    "navigationBarTitleText": "来控卡",
     "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTextStyle": "black",
     "backgroundColor": "#f6f7f9"
