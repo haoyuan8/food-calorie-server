@@ -214,36 +214,41 @@ Page({
     this.setData({ images: arr });
   },
 
-  // 读图成 base64（云托管通道用）；太大的先压一道，微信通道对包体敏感
-  readBase64(path) {
+  // 读图成 base64（云托管通道用）。
+  // 重要：callContainer 的 JSON 请求体硬上限是 100KiB，超了微信直接回 -606001 系统错误。
+  // 所以这里按"每张图预算"逐级压缩，压到预算以内才上传（budget 单位是 base64 字符数≈字节数）。
+  readBase64(path, budget) {
     const fsm = wx.getFileSystemManager();
-    return new Promise((resolve, reject) => {
-      fsm.getFileInfo({
-        filePath: path,
-        success: info => {
-          const heavy = info.size > 400 * 1024;
-          const go = p => fsm.readFile({
-            filePath: p,
-            encoding: 'base64',
-            success: res => resolve(res.data),
-            fail: reject
-          });
-          const again = p => fsm.getFileInfo({
-            filePath: p,
-            success: i2 => (i2.size > 400 * 1024 ? compress(p, 45, go) : go(p)),
-            fail: () => go(p)
-          });
-          const compress = (p, q, cb) => wx.compressImage({
-            src: p,
-            quality: q,
-            success: r => cb(r.tempFilePath),
-            fail: () => cb(p)
-          });
-          if (!heavy) return go(path);
-          compress(path, 60, again);
-        },
-        fail: reject
+    const read = p => new Promise((resolve, reject) => {
+      fsm.readFile({ filePath: p, encoding: 'base64', success: r => resolve(r.data), fail: reject });
+    });
+    const compress = (p, w, q) => new Promise(resolve => {
+      wx.compressImage({
+        src: p,
+        quality: q,
+        compressedWidth: w,
+        success: r => resolve(r.tempFilePath),
+        fail: () => resolve(null)
       });
+    });
+    // 逐级降：先降质量，再降分辨率
+    const steps = [[800, 60], [700, 55], [600, 50], [500, 45], [420, 40], [340, 35]];
+    return read(path).then(b64 => {
+      if (b64.length <= budget) return b64;
+      let best = b64;
+      const chain = i => {
+        if (i >= steps.length) return best;
+        const [w, q] = steps[i];
+        return compress(path, w, q).then(p => {
+          if (!p) return chain(i + 1);
+          return read(p).then(next => {
+            if (next.length < best.length) best = next;
+            if (next.length <= budget) return next;
+            return chain(i + 1);
+          });
+        });
+      };
+      return chain(0);
     });
   },
 
@@ -271,7 +276,9 @@ Page({
 
     // A. 没填地址 → 走云托管：先提交任务，再轮询（callContainer 单次只有 15 秒）
     if (!saved) {
-      Promise.all(this.data.images.map(p => this.readBase64(p)))
+      // JSON 请求体上限 100KiB，按张数均分预算（留 12KB 给外壳与 jobId 往返）
+      const per = Math.floor(88000 / Math.max(1, this.data.images.length));
+      Promise.all(this.data.images.map(p => this.readBase64(p, per)))
         .then(list => callCloudAnalyze(list))
         .then(jobId => pollCloudJob(jobId, () => {
           if (loadingTipTimer === null) {
@@ -286,7 +293,7 @@ Page({
         })
         .catch(err => {
           if (loadingTipTimer) { clearTimeout(loadingTipTimer); loadingTipTimer = null; wx.hideLoading(); }
-          fail(err, '云托管分析失败，可在「服务端地址」里填自建服务器地址重试。');
+          fail(err, '云托管分析失败，请重试；若反复失败可在「服务端地址」填自建服务器地址。');
         })
         .finally(() => this.setData({ loading: false }));
       return;
