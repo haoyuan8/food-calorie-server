@@ -36,8 +36,9 @@ function buildMultipart(files) {
   return { body: out.buffer, boundary };
 }
 
-// 云托管通道：wx.cloud.callContainer 发 JSON + base64（该接口不支持 multipart 文件）
-function callCloudAnalyze(base64List) {
+// 云托管通道：wx.cloud.callContainer 的 timeout 硬上限只有 15 秒，模型要 14–25 秒，
+// 同步调用必被掐断。所以先提交任务拿 jobId（几百 KB 上传 + 立刻返回），再轮询结果。
+function cloudRequest(path, method, data) {
   if (!wx.cloud) return Promise.reject(new Error('基础库不支持 wx.cloud'));
   if (!app.globalData.cloudReady) {
     wx.cloud.init({ env: CLOUD_ENV, traceUser: true });
@@ -46,24 +47,53 @@ function callCloudAnalyze(base64List) {
   return new Promise((resolve, reject) => {
     wx.cloud.callContainer({
       config: { env: CLOUD_ENV },
-      path: '/api/analyze-json',
-      method: 'POST',
-      header: {
-        'X-WX-SERVICE': CLOUD_SERVICE,
-        'content-type': 'application/json'
-      },
-      data: { images: base64List },
-      timeout: 60000,
+      path,
+      method,
+      header: { 'X-WX-SERVICE': CLOUD_SERVICE, 'content-type': 'application/json' },
+      data: data || {},
+      timeout: 15000, // callContainer 上限就是 15 秒，写大了也无效
       success: res => {
-        let data = res.data;
-        if (typeof data === 'string') {
-          try { data = JSON.parse(data); } catch (e) { return reject(e); }
+        let body = res.data;
+        if (typeof body === 'string') {
+          try { body = JSON.parse(body); } catch (e) { return reject(e); }
         }
-        if (data && data.dishes && data.dishes.length) resolve(data);
-        else reject(new Error((data && (data.detail || data.error)) || '没识别出菜'));
+        resolve({ statusCode: res.statusCode, body });
       },
       fail: reject
     });
+  });
+}
+
+function callCloudAnalyze(base64List) {
+  return cloudRequest('/api/analyze-async', 'POST', { images: base64List })
+    .then(({ statusCode, body }) => {
+      if (!body || !body.jobId) {
+        throw new Error((body && (body.detail || body.error)) || `提交失败(${statusCode})`);
+      }
+      return body.jobId;
+    });
+}
+
+// 轮询：每 1.5 秒问一次，最长 3 分钟
+function pollCloudJob(jobId, onTick) {
+  const started = Date.now();
+  return new Promise((resolve, reject) => {
+    const tick = () => {
+      if (Date.now() - started > 180000) {
+        return reject(new Error('分析超时，请重试'));
+      }
+      cloudRequest(`/api/job/${jobId}`, 'GET')
+        .then(({ body }) => {
+          if (!body) return reject(new Error('轮询返回为空'));
+          if (body.status === 'done' && body.result) return resolve(body.result);
+          if (body.status === 'error') return reject(new Error(body.error || '分析失败'));
+          if (body.status === 'notfound') return reject(new Error('任务不存在或已过期'));
+          if (onTick) onTick();
+          setTimeout(tick, 1500);
+        })
+        .catch(reject);
+    };
+    tick();
   });
 }
 
@@ -203,6 +233,7 @@ Page({
     if (this.data.loading) return;
     if (!this.data.images.length) return wx.showToast({ title: '先拍一张', icon: 'none' });
     this.setData({ loading: true });
+    let loadingTipTimer = null;
 
     const saved = this.data.apiBase || wx.getStorageSync('apiBase') || app.globalData.apiBase || '';
     const done = data => {
@@ -219,12 +250,25 @@ Page({
       });
     };
 
-    // A. 没填地址 → 走云托管 callContainer（正式路径）
+    // A. 没填地址 → 走云托管：先提交任务，再轮询（callContainer 单次只有 15 秒）
     if (!saved) {
       Promise.all(this.data.images.map(p => this.readBase64(p)))
         .then(list => callCloudAnalyze(list))
-        .then(done)
-        .catch(err => fail(err, '云托管请求失败，可在「服务端地址」里填自建服务器地址重试。'))
+        .then(jobId => pollCloudJob(jobId, () => {
+          if (loadingTipTimer === null) {
+            loadingTipTimer = setTimeout(() => {
+              wx.showLoading({ title: '识别中，请稍候', mask: true });
+            }, 3000);
+          }
+        }))
+        .then(data => {
+          if (loadingTipTimer) { clearTimeout(loadingTipTimer); loadingTipTimer = null; wx.hideLoading(); }
+          done(data);
+        })
+        .catch(err => {
+          if (loadingTipTimer) { clearTimeout(loadingTipTimer); loadingTipTimer = null; wx.hideLoading(); }
+          fail(err, '云托管分析失败，可在「服务端地址」里填自建服务器地址重试。');
+        })
         .finally(() => this.setData({ loading: false }));
       return;
     }

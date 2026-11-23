@@ -125,6 +125,24 @@ async function runAnalyze(buffers) {
   };
 }
 
+// 异步任务表：wx.cloud.callContainer 的 timeout 硬上限是 15 秒，
+// 而视觉模型单次分析要 14–25 秒，同步返回必然被掐断。
+// 所以改成「先建任务立刻回 jobId，前端轮询结果」。
+const jobs = new Map();
+const JOB_TTL = 10 * 60 * 1000;
+
+function newJobId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function sweepJobs() {
+  const now = Date.now();
+  for (const [id, job] of jobs) {
+    if (now - job.createdAt > JOB_TTL) jobs.delete(id);
+  }
+}
+setInterval(sweepJobs, 60 * 1000).unref?.();
+
 function sendError(res, err) {
   const status = err.status || 500;
   console.error('[analyze error]', err?.response?.data || err.message);
@@ -146,7 +164,8 @@ app.post('/api/analyze', upload.array('images', 3), async (req, res) => {
   }
 });
 
-// 新增：JSON + base64（云托管 wx.cloud.callContainer 用，不支持 multipart 文件）
+// JSON + base64（云托管 wx.cloud.callContainer 用，不支持 multipart 文件）
+// 同步版：给能等 60 秒的通道（自建服务器/公网 https 调试）用
 app.post('/api/analyze-json', async (req, res) => {
   try {
     const list = Array.isArray(req.body?.images) ? req.body.images : [];
@@ -161,6 +180,47 @@ app.post('/api/analyze-json', async (req, res) => {
   } catch (err) {
     sendError(res, err);
   }
+});
+
+// 异步版（callContainer 正式路径）：立刻回 jobId，模型在后台跑，前端轮询 /api/job/:id
+app.post('/api/analyze-async', (req, res) => {
+  let buffers;
+  try {
+    const list = Array.isArray(req.body?.images) ? req.body.images : [];
+    if (!list.length) throw Object.assign(new Error('至少上传一张图片'), { status: 400 });
+    if (list.length > 3) throw Object.assign(new Error('最多三张图'), { status: 400 });
+    buffers = list.map(item => {
+      const b64 = typeof item === 'string' ? item : (item && item.data) || '';
+      const clean = b64.replace(/^data:image\/\w+;base64,/, '');
+      if (!clean) throw Object.assign(new Error('图片数据为空'), { status: 400 });
+      return Buffer.from(clean, 'base64');
+    });
+  } catch (err) {
+    return sendError(res, err);
+  }
+
+  const id = newJobId();
+  jobs.set(id, { status: 'pending', createdAt: Date.now() });
+  res.status(202).json({ jobId: id, status: 'pending' });
+
+  runAnalyze(buffers)
+    .then(result => jobs.set(id, { status: 'done', result, createdAt: Date.now() }))
+    .catch(err => {
+      console.error('[async job failed]', id, err?.response?.data || err.message);
+      jobs.set(id, {
+        status: 'error',
+        error: err?.response?.data?.error?.message || err.message || '分析失败',
+        createdAt: Date.now()
+      });
+    });
+});
+
+app.get('/api/job/:id', (req, res) => {
+  const job = jobs.get(req.params.id);
+  if (!job) return res.status(404).json({ status: 'notfound', error: '任务不存在或已过期' });
+  if (job.status === 'done') return res.json({ status: 'done', result: job.result });
+  if (job.status === 'error') return res.json({ status: 'error', error: job.error });
+  res.json({ status: 'pending' });
 });
 
 const PORT = process.env.PORT || 3000;
