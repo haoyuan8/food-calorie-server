@@ -202,27 +202,33 @@ Page({
     this.setData({ images: arr });
   },
 
-  // 读图成 base64（云托管通道用）；太大的先压一道，避免请求体过大
+  // 读图成 base64（云托管通道用）；太大的先压一道，微信通道对包体敏感
   readBase64(path) {
     const fsm = wx.getFileSystemManager();
     return new Promise((resolve, reject) => {
       fsm.getFileInfo({
         filePath: path,
         success: info => {
-          const heavy = info.size > 900 * 1024;
+          const heavy = info.size > 400 * 1024;
           const go = p => fsm.readFile({
             filePath: p,
             encoding: 'base64',
             success: res => resolve(res.data),
             fail: reject
           });
-          if (!heavy) return go(path);
-          wx.compressImage({
-            src: path,
-            quality: 70,
-            success: r => go(r.tempFilePath),
-            fail: () => go(path)
+          const again = p => fsm.getFileInfo({
+            filePath: p,
+            success: i2 => (i2.size > 400 * 1024 ? compress(p, 45, go) : go(p)),
+            fail: () => go(p)
           });
+          const compress = (p, q, cb) => wx.compressImage({
+            src: p,
+            quality: q,
+            success: r => cb(r.tempFilePath),
+            fail: () => cb(p)
+          });
+          if (!heavy) return go(path);
+          compress(path, 60, again);
         },
         fail: reject
       });
@@ -243,9 +249,10 @@ Page({
     };
     const fail = (err, tip) => {
       console.error('[analyze failed]', err);
+      const detail = (err && (err.errMsg || err.message) || '').toString().slice(0, 120);
       wx.showModal({
         title: '分析失败',
-        content: tip || '网络或服务异常，请稍后重试。',
+        content: (tip || '网络或服务异常，请稍后重试。') + (detail ? `\n[${detail}]` : ''),
         showCancel: false
       });
     };

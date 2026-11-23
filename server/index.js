@@ -201,7 +201,8 @@ app.post('/api/analyze-async', (req, res) => {
 
   const id = newJobId();
   jobs.set(id, { status: 'pending', createdAt: Date.now() });
-  res.status(202).json({ jobId: id, status: 'pending' });
+  // 用 200 而不是 202：callContainer 对非 200 的兼容性不稳，统一走 200 最保险
+  res.status(200).json({ jobId: id, status: 'pending' });
 
   runAnalyze(buffers)
     .then(result => jobs.set(id, { status: 'done', result, createdAt: Date.now() }))
