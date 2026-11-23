@@ -12,6 +12,26 @@ const ACTIVITY = [
 ];
 const GOAL = [{ label: '减重', v: 'lose' }, { label: '保持', v: 'keep' }, { label: '增肌', v: 'gain' }];
 
+// 热量刻度色带（老钟 239/240 号定）：
+// 黄(不到70%) / 绿(70-100%) / 红(超100%) 三段等长，各占总长 1/3；刻度到预算 150% 为止。
+// 填色从左往右逐步填：只填到"今天已记录"那一点，右边留空；超过 150% 标记顶在最右端。
+function bandOf(recorded, budget) {
+  const ratio = budget > 0 ? recorded / budget : 0;
+  // 每段内部填多少（0-1）
+  const f1 = Math.min(1, Math.max(0, ratio / 0.7));
+  const f2 = Math.min(1, Math.max(0, (ratio - 0.7) / 0.3));
+  const f3 = Math.min(1, Math.max(0, (ratio - 1.0) / 0.5));
+  // 整条色带上的填充进度 = 三段均已等长，取平均
+  const mark = Math.min(1, (f1 + f2 + f3) / 3);
+  return {
+    bandF1: (f1 * 100).toFixed(1) + '%',
+    bandF2: (f2 * 100).toFixed(1) + '%',
+    bandF3: (f3 * 100).toFixed(1) + '%',
+    bandMark: (mark * 100).toFixed(1) + '%',
+    bandRatio: ratio
+  };
+}
+
 // 把多张图片拼成一个 multipart/form-data 请求体，一次发给后端（后端一次收 3 张，模型一次看全）。
 // 微信 wx.uploadFile 一次只能发一个文件，所以这里用 wx.request 手写 multipart。
 function buildMultipart(files) {
@@ -142,15 +162,16 @@ Page({
 
   refreshDaily() {
     const rec = daily.load();
-    const { budget, personalized } = profileUtil.budgetOf(this.data.profile);
+    const { budget, personalized, basis } = profileUtil.budgetOf(this.data.profile);
     const lv = daily.level(rec.kcalMid, budget);
     const color = lv.key === 'low' ? '#b45309' : lv.key === 'ok' ? '#15803d' : '#dc2626';
-    this.setData({
+    const basisText = personalized ? '专属' : (basis === 'sex' ? '按性别' : '通用');
+    this.setData(Object.assign({
       recorded: rec.kcalMid,
-      budgetText: `${budget} kcal（${personalized ? '专属' : '通用'}）`,
+      budgetText: `${budget} kcal（${basisText}）`,
       levelText: lv.text,
       levelColor: color
-    });
+    }, bandOf(rec.kcalMid, budget)));
   },
 
   toggleProfile() { this.setData({ showProfile: !this.data.showProfile }); },
