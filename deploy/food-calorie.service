@@ -1,0 +1,17 @@
+[Unit]
+Description=Food Calorie API (qwen3-vl-plus)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/food-calorie
+EnvironmentFile=/etc/food-calorie.env
+ExecStart=/usr/bin/node index.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
