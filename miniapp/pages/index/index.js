@@ -64,19 +64,26 @@ function cloudRequest(path, method, data) {
   });
 }
 
-function callCloudAnalyze(base64List) {
+function callCloudAnalyze(base64List, tries) {
+  const left = typeof tries === 'number' ? tries : 2;
   return cloudRequest('/api/analyze-async', 'POST', { images: base64List })
     .then(({ statusCode, body }) => {
       if (!body || !body.jobId) {
         throw new Error((body && (body.detail || body.error)) || `提交失败(${statusCode})`);
       }
       return body.jobId;
+    })
+    .catch(err => {
+      // 微信侧偶发 -606001（实例重建/系统抖动）会自动重试，用户基本无感
+      if (left <= 0) throw err;
+      return new Promise(r => setTimeout(r, 1500)).then(() => callCloudAnalyze(base64List, left - 1));
     });
 }
 
-// 轮询：每 1.5 秒问一次，最长 3 分钟
+// 轮询：每 1.5 秒问一次，最长 3 分钟；单次网络抖动不直接判失败
 function pollCloudJob(jobId, onTick) {
   const started = Date.now();
+  let netFail = 0;
   return new Promise((resolve, reject) => {
     const tick = () => {
       if (Date.now() - started > 180000) {
@@ -84,6 +91,7 @@ function pollCloudJob(jobId, onTick) {
       }
       cloudRequest(`/api/job/${jobId}`, 'GET')
         .then(({ body }) => {
+          netFail = 0;
           if (!body) return reject(new Error('轮询返回为空'));
           if (body.status === 'done' && body.result) return resolve(body.result);
           if (body.status === 'error') return reject(new Error(body.error || '分析失败'));
@@ -91,7 +99,11 @@ function pollCloudJob(jobId, onTick) {
           if (onTick) onTick();
           setTimeout(tick, 1500);
         })
-        .catch(reject);
+        .catch(err => {
+          netFail += 1;
+          if (netFail >= 5) return reject(err);
+          setTimeout(tick, 1500);
+        });
     };
     tick();
   });
