@@ -1,0 +1,14 @@
+{
+  "白米饭（食堂档）": { "served": { "min": 200, "max": 250, "unit": "克" }, "kcal": { "min": 260, "max": 325 }, "protein_g": { "min": 5, "max": 7 }, "carb_g": { "min": 57, "max": 72 }, "fat_g": { "min": 0.5, "max": 1 }, "status": "已校准" },
+  "蒜蓉炒小白菜": { "served": { "min": 150, "max": 200, "unit": "克" }, "kcal": { "min": 60, "max": 110 }, "protein_g": { "min": 2, "max": 4 }, "carb_g": { "min": 4, "max": 8 }, "fat_g": { "min": 3, "max": 7 }, "status": "初估" },
+  "青椒炒肉片": { "served": { "min": 200, "max": 280, "unit": "克" }, "kcal": { "min": 220, "max": 320 }, "protein_g": { "min": 14, "max": 22 }, "carb_g": { "min": 6, "max": 12 }, "fat_g": { "min": 14, "max": 24 }, "status": "初估" },
+  "肉末蒸蛋": { "served": { "min": 150, "max": 200, "unit": "克" }, "kcal": { "min": 160, "max": 260 }, "protein_g": { "min": 12, "max": 18 }, "carb_g": { "min": 2, "max": 5 }, "fat_g": { "min": 10, "max": 18 }, "status": "初估" },
+  "肉片炒冬瓜": { "served": { "min": 200, "max": 300, "unit": "克" }, "kcal": { "min": 90, "max": 160 }, "protein_g": { "min": 6, "max": 10 }, "carb_g": { "min": 5, "max": 10 }, "fat_g": { "min": 5, "max": 10 }, "status": "初估" },
+  "剁椒鱼块": { "served": { "min": 100, "max": 150, "unit": "克" }, "kcal": { "min": 120, "max": 190 }, "protein_g": { "min": 14, "max": 20 }, "carb_g": { "min": 2, "max": 5 }, "fat_g": { "min": 6, "max": 12 }, "status": "初估" },
+  "清汤": { "served": { "min": 250, "max": 350, "unit": "克" }, "kcal": { "min": 30, "max": 80 }, "protein_g": { "min": 1, "max": 3 }, "carb_g": { "min": 2, "max": 6 }, "fat_g": { "min": 1, "max": 3 }, "status": "初估" },
+  "粟米汤": { "served": { "min": 180, "max": 220, "unit": "克" }, "kcal": { "min": 60, "max": 100 }, "protein_g": { "min": 2, "max": 4 }, "carb_g": { "min": 10, "max": 16 }, "fat_g": { "min": 1, "max": 3 }, "status": "已闭环对照" },
+  "番茄鸡蛋牛肉面": { "served": { "min": 500, "max": 600, "unit": "克（整碗）" }, "kcal": { "min": 550, "max": 700 }, "protein_g": { "min": 25, "max": 35 }, "carb_g": { "min": 70, "max": 90 }, "fat_g": { "min": 15, "max": 25 }, "status": "样例验证" },
+  "奶咖啡": { "served": { "min": 300, "max": 350, "unit": "毫升（整杯）" }, "kcal": { "min": 50, "max": 80 }, "protein_g": { "min": 3, "max": 5 }, "carb_g": { "min": 5, "max": 9 }, "fat_g": { "min": 2, "max": 4 }, "status": "样例验证" },
+  "炒白菜": { "served": { "min": 150, "max": 200, "unit": "克" }, "kcal": { "min": 50, "max": 100 }, "protein_g": { "min": 2, "max": 4 }, "carb_g": { "min": 4, "max": 8 }, "fat_g": { "min": 3, "max": 6 }, "status": "初估" },
+  "酸菜鱼": { "served": { "min": 300, "max": 400, "unit": "克" }, "kcal": { "min": 260, "max": 420 }, "protein_g": { "min": 20, "max": 30 }, "carb_g": { "min": 8, "max": 15 }, "fat_g": { "min": 15, "max": 28 }, "status": "初估" }
+}

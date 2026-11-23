@@ -1,0 +1,45 @@
+<view wx:if="{{result}}" class="card">
+  <view style="font-weight:600;font-size:32rpx;">盘里这些</view>
+  <view wx:for="{{result.dishes}}" wx:key="index" class="dish">
+    <view class="row between">
+      <text style="font-weight:600;">{{item.name}}</text>
+      <text class="tag {{item.source==='营养表'?'tag-table':'tag-model'}}">{{item.source}}</text>
+    </view>
+    <view class="muted" style="margin-top:6rpx;">盘里约 {{item.served.min}}–{{item.served.max}} {{item.served.unit}}</view>
+    <view class="muted">热量 {{item.kcal.min}}–{{item.kcal.max}} kcal ｜ 蛋白 {{item.protein_g.min}}–{{item.protein_g.max}}g ｜ 碳水 {{item.carb_g.min}}–{{item.carb_g.max}}g ｜ 脂肪 {{item.fat_g.min}}–{{item.fat_g.max}}g</view>
+    <view wx:if="{{item.table_status}}" class="muted">表内状态：{{item.table_status}}</view>
+  </view>
+  <view class="divider"></view>
+  <view class="row between">
+    <text style="font-weight:600;">整盘合计</text>
+    <text style="font-weight:600;">{{result.total.kcal.min}}–{{result.total.kcal.max}} kcal</text>
+  </view>
+  <view class="muted">蛋白 {{result.total.protein_g.min}}–{{result.total.protein_g.max}}g ｜ 碳水 {{result.total.carb_g.min}}–{{result.total.carb_g.max}}g ｜ 脂肪 {{result.total.fat_g.min}}–{{result.total.fat_g.max}}g</view>
+</view>
+
+<view wx:if="{{result}}" class="card">
+  <view style="font-weight:600;">你吃了几成？</view>
+  <view class="muted" style="margin:8rpx 0 16rpx;">先估盘里多少，再乘吃掉的比例，才是你摄入的量。</view>
+  <view class="ratios">
+    <view wx:for="{{ratioOptions}}" wx:key="value" class="ratio {{ratio===item.value?'active':''}}" bindtap="pickRatio" data-value="{{item.value}}">{{item.label}}</view>
+  </view>
+  <view wx:if="{{ratio !== null}}" style="margin-top:20rpx;">
+    <view class="row between">
+      <text>吃掉约</text>
+      <text style="font-weight:600;">{{eaten.kcal.min}}–{{eaten.kcal.max}} kcal</text>
+    </view>
+    <view class="muted">份量约 {{eaten.served.min}}–{{eaten.served.max}} 克（按 {{ratio}}% 折算）</view>
+    <view wx:if="{{isDefault}}" class="muted" style="color:#b45309;">8 成估算、未核实</view>
+  </view>
+</view>
+
+<view wx:if="{{result}}" class="card">
+  <view style="font-weight:600;">吃多少合适</view>
+  <view style="margin-top:10rpx;line-height:1.6;">{{result.advice}}</view>
+  <view class="muted" style="margin-top:12rpx;">仅供参考</view>
+</view>
+
+<view wx:if="{{result}}" style="margin:24rpx;">
+  <view class="btn-primary" bindtap="commit">记这一笔</view>
+  <view class="btn-ghost" style="margin-top:16rpx;" bindtap="back">再拍一张</view>
+</view>

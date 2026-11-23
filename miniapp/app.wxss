@@ -1,0 +1,8 @@
+page { background: #f6f7f9; color: #1f2329; font-size: 28rpx; }
+.card { background: #fff; border-radius: 20rpx; padding: 28rpx; margin: 20rpx 24rpx; box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.04); }
+.btn-primary { background: #16a34a; color: #fff; border-radius: 16rpx; padding: 24rpx; text-align: center; font-weight: 600; }
+.btn-ghost { background: #eef2f7; color: #1f2329; border-radius: 16rpx; padding: 20rpx; text-align: center; }
+.tag { display: inline-block; font-size: 22rpx; padding: 4rpx 12rpx; border-radius: 8rpx; margin-left: 8rpx; }
+.tag-table { background: #dcfce7; color: #15803d; }
+.tag-model { background: #fef3c7; color: #b45309; }
+.muted { color: #6b7280; font-size: 24rpx; }

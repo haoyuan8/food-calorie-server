@@ -1,0 +1,72 @@
+<view class="card">
+  <view class="row between">
+    <text style="font-weight:600;">今日对照</text>
+    <text class="muted">预算 {{budgetText}}</text>
+  </view>
+  <view class="muted" style="margin-top:8rpx;">已记录约 {{recorded}} kcal（按拍过的算）</view>
+  <view class="muted" style="margin-top:8rpx;color:{{levelColor}};">{{levelText}}</view>
+</view>
+
+<view class="card">
+  <view class="row between" bindtap="toggleProfile">
+    <text style="font-weight:600;">个人资料（可留空）</text>
+    <text class="muted">{{showProfile ? '收起' : '展开'}}</text>
+  </view>
+  <view wx:if="{{showProfile}}" style="margin-top:20rpx;">
+    <view class="row">
+      <text class="label">性别</text>
+      <radio-group bindchange="onProfile" data-k="sex" class="row">
+        <label><radio value="male" checked="{{profile.sex==='male'}}"/>男</label>
+        <label style="margin-left:24rpx;"><radio value="female" checked="{{profile.sex==='female'}}"/>女</label>
+      </radio-group>
+    </view>
+    <view class="row"><text class="label">年龄</text><input type="number" value="{{profile.age}}" data-k="age" bindinput="onProfile" placeholder="岁"/></view>
+    <view class="row"><text class="label">身高</text><input type="number" value="{{profile.height}}" data-k="height" bindinput="onProfile" placeholder="cm"/></view>
+    <view class="row"><text class="label">体重</text><input type="number" value="{{profile.weight}}" data-k="weight" bindinput="onProfile" placeholder="kg"/></view>
+    <view class="row">
+      <text class="label">活动量</text>
+      <picker range="{{activityLabels}}" bindchange="onActivity">
+        <view>{{activityLabels[activityIndex]}}</view>
+      </picker>
+    </view>
+    <view class="row">
+      <text class="label">目标</text>
+      <picker range="{{goalLabels}}" bindchange="onGoal">
+        <view>{{goalLabels[goalIndex]}}</view>
+      </picker>
+    </view>
+    <view class="btn-ghost" style="margin-top:12rpx;" bindtap="saveProfile">保存资料</view>
+  </view>
+</view>
+
+<view class="card">
+  <view class="row between" bindtap="toggleServer">
+    <text style="font-weight:600;">服务端地址</text>
+    <text class="muted">{{showServer ? '收起' : '展开'}}</text>
+  </view>
+  <view wx:if="{{showServer}}" style="margin-top:20rpx;">
+    <view class="row">
+      <text class="label">地址</text>
+      <input value="{{apiBase}}" bindinput="onApiBase" placeholder="http://localhost:3000" />
+    </view>
+    <view class="muted" style="margin-top:12rpx;">真机测试请填电脑的局域网地址，例如 http://192.168.1.100:3000；留空保存即恢复默认。</view>
+    <view class="btn-ghost" style="margin-top:12rpx;" bindtap="saveApiBase">保存地址</view>
+  </view>
+</view>
+
+<view class="card">
+  <view style="font-weight:600;">拍照分析</view>
+  <view class="muted" style="margin:8rpx 0 16rpx;">主推一张 45° 斜拍，筷子、碗、杯子入画作参照物；可补侧面，最多三张。</view>
+  <view class="grid">
+    <view wx:for="{{images}}" wx:key="index" class="thumb">
+      <image src="{{item}}" mode="aspectFill" class="thumb-img"/>
+      <view class="thumb-del" catchtap="removeImage" data-index="{{index}}">×</view>
+    </view>
+    <view wx:if="{{images.length < 3}}" class="thumb add" bindtap="chooseImage">＋</view>
+  </view>
+  <view class="muted" style="margin-top:12rpx;">为提高准确度可放餐具参照物！</view>
+  <view class="btn-primary" style="margin-top:24rpx;" bindtap="analyze">{{loading ? '分析中…' : '开始分析'}}</view>
+  <view class="muted" style="margin-top:12rpx;">照片会发送到服务端做识别，仅用于本次分析。</view>
+</view>
+
+<view class="muted" style="text-align:center;margin:24rpx;">仅供参考</view>
