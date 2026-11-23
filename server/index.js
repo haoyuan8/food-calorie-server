@@ -8,7 +8,8 @@ const { SYSTEM_PROMPT } = require('./prompt');
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '1mb' }));
+// 云托管 callContainer 走 JSON + base64 传图，单张约 1–3MB base64，故放宽到 16MB
+app.use(express.json({ limit: '16mb' }));
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -73,53 +74,92 @@ function sumRanges(list, field) {
   }), { min: 0, max: 0 });
 }
 
+// 共用分析逻辑：入参是若干张图片的 Buffer，返回给前端的 result 对象
+async function runAnalyze(buffers) {
+  if (!API_KEY) {
+    const err = new Error('服务端未配置 DASHSCOPE_API_KEY');
+    err.status = 500;
+    throw err;
+  }
+  if (!buffers || !buffers.length) {
+    const err = new Error('至少上传一张图片');
+    err.status = 400;
+    throw err;
+  }
+
+  const imageParts = buffers.map(buf => ({
+    type: 'image_url',
+    image_url: { url: bufToDataUrl(buf, 'image/jpeg') }
+  }));
+
+  const body = {
+    model: MODEL,
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: [...imageParts, { type: 'text', text: '请分析这些饭菜照片，按约定 JSON 输出。' }] }
+    ],
+    temperature: 0.3
+  };
+
+  const resp = await axios.post(`${BASE_URL}/chat/completions`, body, {
+    headers: { Authorization: `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
+    timeout: 60000
+  });
+
+  const content = resp.data?.choices?.[0]?.message?.content;
+  const parsed = extractJson(typeof content === 'string' ? content : JSON.stringify(content));
+
+  const merged = (parsed.dishes || []).map(mergeWithTable);
+  const total = {
+    kcal: sumRanges(merged, 'kcal'),
+    protein_g: sumRanges(merged, 'protein_g'),
+    carb_g: sumRanges(merged, 'carb_g'),
+    fat_g: sumRanges(merged, 'fat_g')
+  };
+
+  return {
+    dishes: merged,
+    total,
+    advice: parsed.advice || '这盘看着挺实在，先吃七成、剩下的看心情。',
+    disclaimer: '仅供参考'
+  };
+}
+
+function sendError(res, err) {
+  const status = err.status || 500;
+  console.error('[analyze error]', err?.response?.data || err.message);
+  res.status(status).json({
+    error: status === 400 ? err.message : (status === 500 && err.message.includes('DASHSCOPE_API_KEY') ? err.message : '分析失败，请重试'),
+    detail: err?.response?.data?.error?.message || err.message
+  });
+}
+
 app.get('/health', (_req, res) => res.json({ ok: true, model: MODEL }));
 
+// 原来那条：multipart 上传（局域网/自建服务器用，keep 保留）
 app.post('/api/analyze', upload.array('images', 3), async (req, res) => {
   try {
-    if (!API_KEY) return res.status(500).json({ error: '服务端未配置 DASHSCOPE_API_KEY' });
     const files = req.files || [];
-    if (!files.length) return res.status(400).json({ error: '至少上传一张图片' });
-
-    const imageParts = files.map(f => ({
-      type: 'image_url',
-      image_url: { url: bufToDataUrl(f.buffer, f.mimetype) }
-    }));
-
-    const body = {
-      model: MODEL,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: [...imageParts, { type: 'text', text: '请分析这些饭菜照片，按约定 JSON 输出。' }] }
-      ],
-      temperature: 0.3
-    };
-
-    const resp = await axios.post(`${BASE_URL}/chat/completions`, body, {
-      headers: { Authorization: `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
-      timeout: 60000
-    });
-
-    const content = resp.data?.choices?.[0]?.message?.content;
-    const parsed = extractJson(typeof content === 'string' ? content : JSON.stringify(content));
-
-    const merged = (parsed.dishes || []).map(mergeWithTable);
-    const total = {
-      kcal: sumRanges(merged, 'kcal'),
-      protein_g: sumRanges(merged, 'protein_g'),
-      carb_g: sumRanges(merged, 'carb_g'),
-      fat_g: sumRanges(merged, 'fat_g')
-    };
-
-    res.json({
-      dishes: merged,
-      total,
-      advice: parsed.advice || '这盘看着挺实在，先吃七成、剩下的看心情。',
-      disclaimer: '仅供参考'
-    });
+    res.json(await runAnalyze(files.map(f => f.buffer)));
   } catch (err) {
-    console.error('[analyze error]', err?.response?.data || err.message);
-    res.status(500).json({ error: '分析失败，请重试', detail: err?.response?.data?.error?.message || err.message });
+    sendError(res, err);
+  }
+});
+
+// 新增：JSON + base64（云托管 wx.cloud.callContainer 用，不支持 multipart 文件）
+app.post('/api/analyze-json', async (req, res) => {
+  try {
+    const list = Array.isArray(req.body?.images) ? req.body.images : [];
+    if (list.length > 3) return res.status(400).json({ error: '最多三张图' });
+    const buffers = list.map(item => {
+      const b64 = typeof item === 'string' ? item : (item && item.data) || '';
+      const clean = b64.replace(/^data:image\/\w+;base64,/, '');
+      if (!clean) throw Object.assign(new Error('图片数据为空'), { status: 400 });
+      return Buffer.from(clean, 'base64');
+    });
+    res.json(await runAnalyze(buffers));
+  } catch (err) {
+    sendError(res, err);
   }
 });
 
