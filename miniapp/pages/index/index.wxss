@@ -1,3 +1,14 @@
+/* 联系我们 / 原味认知品牌页（老钟 266 号） */
+.brand-title { font-weight: 700; font-size: 32rpx; color: #000000; letter-spacing: 1rpx; }
+.brand-body { margin-top: 20rpx; }
+.brand-head { display: flex; align-items: center; justify-content: center; }
+.brand-logo { width: 120rpx; height: 120rpx; border-radius: 16rpx; margin-right: 20rpx; }
+.brand-mark { width: 96rpx; height: 96rpx; border-radius: 50%; background: #1f2329; color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 26rpx; margin-right: 16rpx; }
+.brand-name { font-size: 36rpx; font-weight: 600; color: #1f2329; }
+.brand-slogan { margin-top: 16rpx; text-align: center; color: #374151; font-size: 26rpx; line-height: 1.65; }
+.brand-contact { margin-top: 24rpx; background: #1f2329; color: #ffffff; border-radius: 16rpx; padding: 22rpx; font-size: 28rpx; font-weight: 600; }
+.brand-contact::after { border: none; }
+
 /* 自定义导航栏：logo 在"来控卡"前面（老钟 259 号） */
 .nav { position: sticky; top: 0; z-index: 20; background: #ffffff; }
 .nav-bar { display: flex; align-items: center; padding-left: 24rpx; }

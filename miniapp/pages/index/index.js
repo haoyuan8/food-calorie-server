@@ -146,6 +146,8 @@ Page({
     showServer: false,
     apiBase: '',
     usingCloud: true,
+    showBrand: false,
+    brandLogo: '/images/yuanwei-logo.jpg',
     statusBarH: 20,
     navBarH: 44
   },
@@ -168,12 +170,16 @@ Page({
 
   onShow() {
     const p = profileUtil.load() || {};
-    const saved = wx.getStorageSync('apiBase') || app.globalData.apiBase || '';
+    // 266 号：首页不再提供"服务端地址"入口，历史存过的地址一律作废，强制走云托管通道
+    try {
+      if (wx.getStorageSync('apiBase')) wx.removeStorageSync('apiBase');
+      app.globalData.apiBase = '';
+    } catch (e) {}
     this.setData({
       profile: p,
       showProfile: false,
-      apiBase: saved,
-      usingCloud: !saved
+      apiBase: '',
+      usingCloud: true
     });
     this.refreshDaily();
   },
@@ -213,26 +219,8 @@ Page({
     wx.showToast({ title: '已保存' });
   },
 
-  // 地址入口：留空 = 走云托管（默认）；填了 = 走自己填的服务器（局域网/自建）
-  toggleServer() { this.setData({ showServer: !this.data.showServer }); },
-
-  onApiBase(e) { this.setData({ apiBase: e.detail.value }); },
-
-  saveApiBase() {
-    let v = (this.data.apiBase || '').trim().replace(/\/+$/, '');
-    if (!v) {
-      wx.removeStorageSync('apiBase');
-      app.globalData.apiBase = '';
-      this.setData({ apiBase: '', usingCloud: true });
-      wx.showToast({ title: '已恢复云托管', icon: 'none' });
-      return;
-    }
-    if (!/^https?:\/\//i.test(v)) v = 'http://' + v;
-    wx.setStorageSync('apiBase', v);
-    app.globalData.apiBase = v;
-    this.setData({ apiBase: v, usingCloud: false });
-    wx.showToast({ title: '已保存' });
-  },
+  // 266 号：联系我们（点开是原味认知品牌页 + 官方客服消息入口）
+  toggleBrand() { this.setData({ showBrand: !this.data.showBrand }); },
 
   chooseImage() {
     wx.chooseMedia({
@@ -297,7 +285,8 @@ Page({
     this.setData({ loading: true });
     let loadingTipTimer = null;
 
-    const saved = this.data.apiBase || wx.getStorageSync('apiBase') || app.globalData.apiBase || '';
+    // 266 号：只走云托管，不再读任何本地保存的服务端地址（历史值已在 onShow 清掉）
+    const saved = '';
     const done = data => {
       app.globalData.lastResult = data;
       app.globalData.lastImages = this.data.images;
@@ -332,7 +321,7 @@ Page({
         })
         .catch(err => {
           if (loadingTipTimer) { clearTimeout(loadingTipTimer); loadingTipTimer = null; wx.hideLoading(); }
-          fail(err, '云托管分析失败，请重试；若反复失败可在「服务端地址」填自建服务器地址。');
+          fail(err, '云托管分析失败，请稍后重试。');
         })
         .finally(() => this.setData({ loading: false }));
       return;

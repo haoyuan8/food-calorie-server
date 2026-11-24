@@ -63,17 +63,19 @@
 </view>
 
 <view class="card">
-  <view class="row between" bindtap="toggleServer">
-    <text style="font-weight:600;">服务端地址</text>
-    <text class="muted">{{showServer ? '收起' : '展开'}}</text>
+  <view class="row between" bindtap="toggleBrand">
+    <text class="brand-title">联系我们</text>
+    <text class="muted">{{showBrand ? '收起' : '展开'}}</text>
   </view>
-  <view wx:if="{{showServer}}" style="margin-top:20rpx;">
-    <view class="row">
-      <text class="label">地址</text>
-      <input value="{{apiBase}}" bindinput="onApiBase" placeholder="http://localhost:3000" />
+  <view wx:if="{{showBrand}}" class="brand-body">
+    <view class="brand-head">
+      <image wx:if="{{brandLogo}}" class="brand-logo" src="{{brandLogo}}" mode="aspectFit" />
+      <view wx:else class="brand-mark">原味</view>
+      <text class="brand-name">原味认知</text>
     </view>
-    <view class="muted" style="margin-top:12rpx;">真机测试请填电脑的局域网地址，例如 http://192.168.1.100:3000；留空保存即恢复默认。</view>
-    <view class="btn-ghost" style="margin-top:12rpx;" bindtap="saveApiBase">保存地址</view>
+    <view class="brand-slogan">财富总会在不经意间以不同的形式出现！</view>
+    <button class="brand-contact" open-type="contact">给原味认知发消息</button>
+    <view class="muted" style="text-align:center;margin-top:12rpx;">点上方按钮可直接在微信里对话</view>
   </view>
 </view>
 
