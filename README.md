@@ -1,13 +1,13 @@
 # 食物热量小程序一期 · 部署与体验版步骤
 
 ## 一、目录
-- server/：后端中转（Express + 百炼 qwen-vl-max + 营养表对表）
+- server/：后端中转（Express + 百炼 qwen3-vl-plus + 营养表对表）
 - miniapp/：微信小程序（原生）
 
 ## 二、后端本地跑通（开发/预览用）
 1. `cd server && npm install`
 2. 复制 `.env.example` 为 `.env`，填入你自己保管的 `DASHSCOPE_API_KEY`（不要在聊天里发 key）。
-3. `npm start`，访问 `http://localhost:3000/health` 应返回 `{"ok":true,"model":"qwen-vl-max"}`。
+3. `npm start`，访问 `http://localhost:3000/health` 应返回 `{"ok":true,"model":"qwen3-vl-plus"}`。
 4. 用 curl 或 Postman 测：`POST /api/analyze`，form-data 字段名 `images`，传一张菜品图，应返回 dishes/total/advice。
 
 ## 三、开发版真机预览（最快）
