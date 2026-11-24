@@ -158,12 +158,41 @@ function cstStamp(d) {
   return new Date(d.getTime() + 8 * 3600e3).toISOString().replace('T', ' ').slice(0, 19) + ' +08';
 }
 
+// 进程内累计统计（按北京时间日分桶），供 /usage/summary 只读查询。
+// 注意：存在实例内存里，发版/实例重建会清零；长期台账靠按日抓取落盘，两者互补。
+const stats = { startedAt: new Date().toISOString(), days: new Map(), total: 0, allUids: new Set() };
+
+function cstDay(d) {
+  return new Date(d.getTime() + 8 * 3600e3).toISOString().slice(0, 10);
+}
+
+function statsAdd(uid, ep, ok) {
+  // async_submit 只是提交量，不算一次"使用"
+  if (ep === 'async_submit') return;
+  const k = cstDay(new Date());
+  let b = stats.days.get(k);
+  if (!b) {
+    b = { total: 0, ok: 0, fail: 0, uids: new Set() };
+    stats.days.set(k, b);
+  }
+  b.total++;
+  if (ok) b.ok++; else b.fail++;
+  b.uids.add(uid);
+  stats.total++;
+  stats.allUids.add(uid);
+  if (stats.days.size > 14) {
+    const keys = [...stats.days.keys()].sort();
+    while (keys.length > 14) stats.days.delete(keys.shift());
+  }
+}
+
 // ep: mp | json | async_submit | async_done
 function usageLog(uid, ep, imgs, ok, extra) {
   const now = new Date();
   const obj = { ts: now.toISOString(), tscs: cstStamp(now), ep, uid, imgs, ok: !!ok };
   if (extra) Object.assign(obj, extra);
   const line = '[usage] ' + JSON.stringify(obj);
+  statsAdd(uid, ep, !!ok);
   setImmediate(() => console.log(line));
 }
 
@@ -177,6 +206,21 @@ function sendError(res, err) {
 }
 
 app.get('/health', (_req, res) => res.json({ ok: true, model: MODEL }));
+
+// 使用量只读统计：需 USAGE_TOKEN（环境变量），未配置或 token 不对一律 404，不暴露接口存在。
+app.get('/usage/summary', (req, res) => {
+  const token = process.env.USAGE_TOKEN;
+  if (!token || req.query.token !== token) return res.status(404).json({ error: 'not found' });
+  const days = [...stats.days.entries()]
+    .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+    .map(([date, b]) => ({ date, total: b.total, ok: b.ok, fail: b.fail, users: b.uids.size }));
+  res.json({
+    startedAt: stats.startedAt,
+    total: stats.total,
+    users: stats.allUids.size,
+    days
+  });
+});
 
 // 原来那条：multipart 上传（局域网/自建服务器用，keep 保留）
 app.post('/api/analyze', upload.array('images', 3), async (req, res) => {
