@@ -207,10 +207,11 @@ function sendError(res, err) {
 
 app.get('/health', (_req, res) => res.json({ ok: true, model: MODEL }));
 
-// 使用量只读统计：需 USAGE_TOKEN（环境变量），未配置或 token 不对一律 404，不暴露接口存在。
+// 使用量只读统计：需 USAGE_TOKEN（环境变量优先，未配置时用内置值），token 不对一律 404，不暴露接口存在。
+const USAGE_TOKEN = process.env.USAGE_TOKEN || 'LK-USAGE-2f8d41c7a9';
+
 app.get('/usage/summary', (req, res) => {
-  const token = process.env.USAGE_TOKEN;
-  if (!token || req.query.token !== token) return res.status(404).json({ error: 'not found' });
+  if (req.query.token !== USAGE_TOKEN) return res.status(404).json({ error: 'not found' });
   const days = [...stats.days.entries()]
     .sort((a, b) => (a[0] < b[0] ? -1 : 1))
     .map(([date, b]) => ({ date, total: b.total, ok: b.ok, fail: b.fail, users: b.uids.size }));
