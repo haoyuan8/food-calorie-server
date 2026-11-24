@@ -20,11 +20,11 @@ function add(kcalMin, kcalMax, label) {
   wx.setStorageSync(KEY, rec);
   return rec;
 }
-// 三档：<70 偏少 / 70-100 快到量 / >100 爆表
+// 三档：<70 偏少 / 70-100 快到量 / >100 爆表（黄绿文案由老钟 263 号定稿，原句照抄不改）
 function level(recorded, budget) {
   const ratio = budget > 0 ? recorded / budget : 0;
-  if (ratio < 0.7) return { key: 'low', ratio, text: '今天记得偏少——不过只算你拍过的，没拍的没算，真数只会更高，别拿这个数去加餐。' };
-  if (ratio <= 1.0) return { key: 'ok', ratio, text: '快到量了，下一顿悠着点，别爆表。' };
+  if (ratio < 0.7) return { key: 'low', ratio, text: '你是没拍齐，还是让手机先吃了，卡量没跑绿人生白忙碌！' };
+  if (ratio <= 1.0) return { key: 'ok', ratio, text: '你是控卡达人。福禄寿全美如仙！' };
   return { key: 'over', ratio, text: '爆表了，出去迈开步：溜溜狗、与情人散个步、原地深蹲五十次，挑一个。' };
 }
 
