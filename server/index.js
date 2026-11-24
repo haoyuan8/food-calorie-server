@@ -143,6 +143,30 @@ function sweepJobs() {
 }
 setInterval(sweepJobs, 60 * 1000).unref?.();
 
+// ===== 使用量统计 =====
+// 只记「时间 / 代号 / 张数 / 菜品数 / 成败」，绝不记照片内容、姓名、手机号、IP。
+// 代号用微信云托管透传的 x-wx-openid（opaque ID，不是个人信息），拿不到就记 anonymous。
+// 落日志用 setImmediate 推到响应之后，任何一个字节的 I/O 都不挡分析结果返回。
+function uidOf(req) {
+  const raw = req.headers['x-wx-openid'] ?? req.headers['X-WX-OPENID'];
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  const s = typeof v === 'string' ? v.trim() : '';
+  return s ? s.slice(0, 64) : 'anonymous';
+}
+
+function cstStamp(d) {
+  return new Date(d.getTime() + 8 * 3600e3).toISOString().replace('T', ' ').slice(0, 19) + ' +08';
+}
+
+// ep: mp | json | async_submit | async_done
+function usageLog(uid, ep, imgs, ok, extra) {
+  const now = new Date();
+  const obj = { ts: now.toISOString(), tscs: cstStamp(now), ep, uid, imgs, ok: !!ok };
+  if (extra) Object.assign(obj, extra);
+  const line = '[usage] ' + JSON.stringify(obj);
+  setImmediate(() => console.log(line));
+}
+
 function sendError(res, err) {
   const status = err.status || 500;
   console.error('[analyze error]', err?.response?.data || err.message);
@@ -156,34 +180,52 @@ app.get('/health', (_req, res) => res.json({ ok: true, model: MODEL }));
 
 // 原来那条：multipart 上传（局域网/自建服务器用，keep 保留）
 app.post('/api/analyze', upload.array('images', 3), async (req, res) => {
+  const t0 = Date.now();
+  const uid = uidOf(req);
+  const files = req.files || [];
+  let ok = false;
   try {
-    const files = req.files || [];
-    res.json(await runAnalyze(files.map(f => f.buffer)));
+    const result = await runAnalyze(files.map(f => f.buffer));
+    res.json(result);
+    ok = true;
+    usageLog(uid, 'mp', files.length, true, { dishes: result.dishes.length, ms: Date.now() - t0 });
   } catch (err) {
     sendError(res, err);
+    usageLog(uid, 'mp', files.length, false, { ms: Date.now() - t0 });
   }
 });
 
 // JSON + base64（云托管 wx.cloud.callContainer 用，不支持 multipart 文件）
 // 同步版：给能等 60 秒的通道（自建服务器/公网 https 调试）用
 app.post('/api/analyze-json', async (req, res) => {
+  const t0 = Date.now();
+  const uid = uidOf(req);
+  const list = Array.isArray(req.body?.images) ? req.body.images : [];
+  let ok = false;
+  let dishes = 0;
   try {
-    const list = Array.isArray(req.body?.images) ? req.body.images : [];
-    if (list.length > 3) return res.status(400).json({ error: '最多三张图' });
+    if (list.length > 3) throw Object.assign(new Error('最多三张图'), { status: 400 });
     const buffers = list.map(item => {
       const b64 = typeof item === 'string' ? item : (item && item.data) || '';
       const clean = b64.replace(/^data:image\/\w+;base64,/, '');
       if (!clean) throw Object.assign(new Error('图片数据为空'), { status: 400 });
       return Buffer.from(clean, 'base64');
     });
-    res.json(await runAnalyze(buffers));
+    const result = await runAnalyze(buffers);
+    res.json(result);
+    ok = true;
+    dishes = result.dishes.length;
   } catch (err) {
     sendError(res, err);
+  } finally {
+    usageLog(uid, 'json', list.length, ok, { dishes, ms: Date.now() - t0 });
   }
 });
 
 // 异步版（callContainer 正式路径）：立刻回 jobId，模型在后台跑，前端轮询 /api/job/:id
 app.post('/api/analyze-async', (req, res) => {
+  const t0 = Date.now();
+  const uid = uidOf(req);
   let buffers;
   try {
     const list = Array.isArray(req.body?.images) ? req.body.images : [];
@@ -196,16 +238,22 @@ app.post('/api/analyze-async', (req, res) => {
       return Buffer.from(clean, 'base64');
     });
   } catch (err) {
+    usageLog(uid, 'async_submit', 0, false, { reason: 'bad_request', ms: Date.now() - t0 });
     return sendError(res, err);
   }
 
   const id = newJobId();
+  const n = buffers.length;
   jobs.set(id, { status: 'pending', createdAt: Date.now() });
   // 用 200 而不是 202：callContainer 对非 200 的兼容性不稳，统一走 200 最保险
   res.status(200).json({ jobId: id, status: 'pending' });
+  usageLog(uid, 'async_submit', n, true, { job: id });
 
   runAnalyze(buffers)
-    .then(result => jobs.set(id, { status: 'done', result, createdAt: Date.now() }))
+    .then(result => {
+      jobs.set(id, { status: 'done', result, createdAt: Date.now() });
+      usageLog(uid, 'async_done', n, true, { job: id, dishes: result.dishes.length, ms: Date.now() - t0 });
+    })
     .catch(err => {
       console.error('[async job failed]', id, err?.response?.data || err.message);
       jobs.set(id, {
@@ -213,6 +261,7 @@ app.post('/api/analyze-async', (req, res) => {
         error: err?.response?.data?.error?.message || err.message || '分析失败',
         createdAt: Date.now()
       });
+      usageLog(uid, 'async_done', n, false, { job: id, ms: Date.now() - t0 });
     });
 });
 
