@@ -1,3 +1,9 @@
+/* 自定义导航栏：logo 在"来控卡"前面（老钟 259 号） */
+.nav { position: sticky; top: 0; z-index: 20; background: #ffffff; }
+.nav-bar { display: flex; align-items: center; padding-left: 24rpx; }
+.nav-logo { height: 60rpx; margin-right: 12rpx; }
+.nav-title { font-size: 34rpx; font-weight: 600; letter-spacing: 2rpx; color: #1f2329; }
+
 .row { display: flex; align-items: center; }
 .between { justify-content: space-between; }
 .label { width: 140rpx; color: #6b7280; }

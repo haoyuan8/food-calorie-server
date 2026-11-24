@@ -145,7 +145,25 @@ Page({
     levelColor: '#6b7280',
     showServer: false,
     apiBase: '',
-    usingCloud: true
+    usingCloud: true,
+    statusBarH: 20,
+    navBarH: 44
+  },
+
+  onLoad() {
+    // 自定义导航栏（老钟 259 号：首页标题前要放 logo）：状态栏高度 + 导航栏高度按胶囊按钮实测算
+    try {
+      const info = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync();
+      const statusBarH = info.statusBarHeight || 20;
+      let navBarH = 44;
+      const menu = wx.getMenuButtonBoundingClientRect ? wx.getMenuButtonBoundingClientRect() : null;
+      if (menu && menu.top && menu.height) {
+        navBarH = (menu.top - statusBarH) * 2 + menu.height;
+      }
+      this.setData({ statusBarH: statusBarH, navBarH: Math.round(navBarH) });
+    } catch (e) {
+      // 取不到就退回默认值，不影响使用
+    }
   },
 
   onShow() {

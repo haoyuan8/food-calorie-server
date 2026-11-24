@@ -1,3 +1,10 @@
+<view class="nav" style="padding-top:{{statusBarH}}px;">
+  <view class="nav-bar" style="height:{{navBarH}}px;">
+    <image class="nav-logo" src="/images/logo-dancer.png" mode="heightFix" />
+    <text class="nav-title">来控卡</text>
+  </view>
+</view>
+
 <view class="card">
   <view class="row between">
     <text style="font-weight:600;">今日对照</text>
